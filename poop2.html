@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Brainrot Idle Game Épico</title>
+<style>
+  body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; text-align:center; margin:0; padding:0;}
+  h1 { color:#FFEB3B; margin-top:20px; text-shadow:2px 2px 5px black;}
+  
+  #status, #rebirthStatus { margin:10px; font-size:18px; }
+  
+  button {
+    padding:12px 25px;
+    margin:5px;
+    border:none;
+    border-radius:12px;
+    cursor:pointer;
+    font-weight:bold;
+    font-size:16px;
+    transition:0.3s;
+  }
+  button:hover { transform:scale(1.1); box-shadow:0 0 15px #FFD700; }
+
+  #inventario div {
+    margin:5px auto;
+    padding:8px;
+    border-radius:8px;
+    width:80%;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    transition:0.5s;
+  }
+
+  .comum{color:gray; animation:none;}
+  .raro{color:blue; animation:piscar 1.5s infinite;}
+  .epico{color:purple; animation:piscar 1.2s infinite;}
+  .lendario{color:gold; animation:piscar 1s infinite;}
+  .secreto{color:red; animation:piscar 0.8s infinite;}
+
+  @keyframes piscar {
+    0% {opacity:1;}
+    50% {opacity:0.3;}
+    100% {opacity:1;}
+  }
+
+  #batalhaLog {
+    height:120px;
+    overflow:auto;
+    text-align:left;
+    background:#333;
+    padding:5px;
+    margin:10px auto;
+    width:90%;
+    border-radius:10px;
+  }
+
+  #leaderboard {
+    margin:10px auto;
+    width:90%;
+    background:#222;
+    padding:5px;
+    border-radius:10px;
+    text-align:left;
+  }
+</style>
+</head>
+<body>
+
+<h1>🎮 Brainrot Idle Game Épico 🎮</h1>
+<div id="status">Dinheiro: R$500</div>
+<div id="ganho">Ganho p/s: R$0</div>
+<div id="rebirthStatus">Próximo Rebirth: R$1000</div>
+
+<button onclick="sortearBrainrot()" style="background:#4CAF50; color:white;">Sortear Brainrot (R$250)</button>
+<button onclick="fazerRebirth()" style="background:#FF9800; color:white;">Rebirth</button>
+<button onclick="ativarEvento()" style="background:#9C27B0; color:white;">Evento Especial 30s</button>
+<button onclick="abrirLoja()" style="background:#2196F3; color:white;">Loja de Boosts</button>
+<button onclick="batalhar()" style="background:#F44336; color:white;">Batalhar</button>
+
+<h2>🗂 Inventário</h2>
+<div id="inventario"></div>
+
+<h2>🏆 Leaderboard Local</h2>
+<div id="leaderboard"></div>
+
+<h2>⚔️ Batalha</h2>
+<div id="batalhaLog"></div>
+
+<script>
+// ---- Configurações ----
+let jogador = {
+    dinheiro:500, ganhoBonus:1, sortBoost:0, rebirths:0, brainrots:[], maxBrainrots:5, eventoAtivo:false
+};
+
+const brainrots = {
+    comum:["Tralalero Tralala", "Noobini Pizzanini", "Trippi Troppi", "Tung Tung Sahur",
+    "Tralimero Tralicina", "Tralimero Trulicina", "Chimpanzini Bananini",
+    "Espresso Signora", "Odin Din Din Dun", "Statutino Libertino",
+    "Trenostruzzo Turbo 3000", "Ballerino Lololo", "Trigoligre Frutonni",
+    "Orcalero Orcala", "Los Crocodilitos", "Piccione Macchina",
+    "Los Crocodillitos", "Los Matteos", "Los Spyderini", "Mimimero Mimo"],
+    raro:["La Vacca Saturno Saturnita", "Chimpanzini Spiderini", "Los Tralaleritos",
+    "Las Tralaleritas", "Graipuss Medussi", "La Grande Combinasion",
+    "Nuclearo Dinossauro", "Garama and Madundung", "Fuffifero Fufi", "Lullibero Lulli"],
+    epico:["Tortuginni Dragonfruitini", "Pot Hotspot", "Las Vaquitas Saturnitas",
+    "Chicleteira Bicicleteira", "Agarrini la Palini"],
+    lendario:["Il Magnifico Tralaro", "Supremo Bellarone", "Re dei Tralaros"],
+    secreto:["Manuzoca", "Ultra tralalero Tralala"]
+};
+
+const valores = {comum:1, raro:3, epico:8, lendario:25, secreto:80};
+const cores = {comum:'comum', raro:'raro', epico:'epico', lendario:'lendario', secreto:'secreto'};
+const rebirthReqs = {1:{},2:{raro:1},3:{raro:1,epico:1},4:{lendario:1},5:{secreto:1}};
+
+// ---- Funções ----
+function atualizarDinheiro(){
+    let ganho = jogador.brainrots.reduce((a,b)=>a+b.dinheiro,0);
+    let categorias = new Set(jogador.brainrots.map(b=>b.categoria));
+    let bonus = 1 + 0.05*categorias.size*jogador.rebirths;
+    if (["comum","raro","epico","lendario","secreto"].every(c=>categorias.has(c))) bonus+=0.5;
+    if(jogador.eventoAtivo) bonus*=2;
+    ganho*=jogador.ganhoBonus*bonus;
+    jogador.dinheiro+=ganho;
+    document.getElementById('status').innerText = "Dinheiro: R$"+jogador.dinheiro.toFixed(2);
+    document.getElementById('ganho').innerText = "Ganho p/s: R$"+ganho.toFixed(2);
+}
+setInterval(atualizarDinheiro,1000);
+
+function atualizarInventario(){
+    const inv = document.getElementById('inventario');
+    inv.innerHTML='';
+    jogador.brainrots.forEach((b,i)=>{
+        const div = document.createElement('div');
+        div.className = cores[b.categoria];
+        div.innerHTML = `${b.nome} | ${b.categoria} | ${b.peso}kg | R$${b.dinheiro.toFixed(2)}/s 
+        <button onclick="removerBrainrot(${i})" style="background:#f44336;color:white;border-radius:5px;">Remover</button>
+        <button onclick="venderBrainrot(${i})" style="background:#9C27B0;color:white;border-radius:5px;">Vender</button>`;
+        inv.appendChild(div);
+    });
+}
+
+function sortearBrainrot(){
+    if(jogador.dinheiro<250){alert("Sem dinheiro suficiente!"); return;}
+    jogador.dinheiro-=250;
+    let chance = Math.floor(Math.random()*100)+jogador.sortBoost;
+    if(jogador.eventoAtivo) chance+=15;
+    let categoria,nome,peso;
+    if(chance<=45){categoria='comum';nome=brainrots.comum[Math.floor(Math.random()*brainrots.comum.length)];peso=(Math.random()*7+1).toFixed(2);}
+    else if(chance<=70){categoria='raro';nome=brainrots.raro[Math.floor(Math.random()*brainrots.raro.length)];peso=(Math.random()*10+5).toFixed(2);}
+    else if(chance<=85){categoria='epico';nome=brainrots.epico[Math.floor(Math.random()*brainrots.epico.length)];peso=(Math.random()*25+10).toFixed(2);}
+    else if(chance<=98){categoria='lendario';nome=brainrots.lendario[Math.floor(Math.random()*brainrots.lendario.length)];peso=(Math.random()*90+30).toFixed(2);}
+    else{categoria='secreto';nome=brainrots.secreto[Math.floor(Math.random()*brainrots.secreto.length)];peso=(Math.random()*220+80).toFixed(2);}
+    let dinheiro_ps = valores[categoria]*peso;
+    let br = {nome:nome,categoria:categoria,peso:peso,dinheiro:dinheiro_ps};
+    if(jogador.brainrots.length>=jogador.maxBrainrots){alert("Inventário cheio!"); return;}
+    jogador.brainrots.push(br);
+    if(['epico','lendario','secreto'].includes(categoria)) alert(`🎉 Você conseguiu um brainrot ${categoria}!`);
+    atualizarInventario();
+}
+
+function removerBrainrot(i){jogador.brainrots.splice(i,1); atualizarInventario();}
+function venderBrainrot(i){jogador.dinheiro+=jogador.brainrots[i].dinheiro*0.5; jogador.brainrots.splice(i,1); atualizarInventario();}
+
+function fazerRebirth(){
+    let next = jogador.rebirths+1;
+    let req = rebirthReqs[next]||{};
+    let catJog = {};
+    jogador.brainrots.forEach(b=>{catJog[b.categoria]= (catJog[b.categoria]||0)+1;});
+    for(let c in req){ if((catJog[c]||0)<req[c]){alert(`Faltam ${req[c]}x ${c} para Rebirth`); return;} }
+    let custo = 1000*next;
+    if(jogador.dinheiro<custo){alert(`Falta R$${custo-jogador.dinheiro} para Rebirth`); return;}
+    let bonus = jogador.dinheiro*0.2;
+    jogador.dinheiro = 500+bonus;
+    jogador.brainrots=[];
+    jogador.rebirths++;
+    jogador.ganhoBonus = 1+0.1*jogador.rebirths;
+    jogador.sortBoost = 5*jogador.rebirths;
+    jogador.maxBrainrots = 5+jogador.rebirths;
+    alert(`Rebirth feito! Bônus: R$${bonus.toFixed(2)}\nNovo limite: ${jogador.maxBrainrots}`);
+    document.getElementById('rebirthStatus').innerText = "Próximo Rebirth: R$"+(1000*(jogador.rebirths+1));
+    atualizarInventario();
+    salvarLeaderboard();
+}
+
+function abrirLoja(){
+    let escolha = prompt("Loja de Boosts:\n1) Sorte +10%\n2) Ganho p/s +50%\nEscolha 1 ou 2:");
+    if(escolha==='1'){jogador.sortBoost+=10; alert("Sorte +10% aplicada!");}
+    else if(escolha==='2'){jogador.ganhoBonus*=1.5; alert("Ganho p/s +50% aplicado!");}
+}
+
+function ativarEvento(){
+    if(jogador.eventoAtivo){alert("Evento já ativo!"); return;}
+    jogador.eventoAtivo=true;
+    alert("Evento ativo! Ganhos e chance duplicados por 30s");
+    setTimeout(()=>{jogador.eventoAtivo=false; alert("Evento encerrado!");},30000);
+}
+
+// ---- Batalhas ----
+function batalhar(){
+    if(jogador.brainrots.length===0){alert("Sem brainrots para batalhar!"); return;}
+    let npcForca = Math.random()*50+20;
+    let playerForca = jogador.brainrots.reduce((a,b)=>a+b.dinheiro*0.1,0);
+    let log = document.getElementById('batalhaLog');
+    log.innerHTML='';
+    if(playerForca>=npcForca){
+        let premio = Math.random()*200+50;
+        jogador.dinheiro+=premio;
+        log.innerHTML = `Vitória! Força do NPC: ${npcForca.toFixed(2)} | Sua força: ${playerForca.toFixed(2)}\nVocê ganhou R$${premio.toFixed(2)}`;
+    }else{
+        let perda = Math.min(jogador.dinheiro,Math.random()*100);
+        jogador.dinheiro-=perda;
+        log.innerHTML = `Derrota! Força do NPC: ${npcForca.toFixed(2)} | Sua força: ${playerForca.toFixed(2)}\nVocê perdeu R$${perda.toFixed(2)}`;
+    }
+}
+
+// ---- Leaderboard Local ----
+function salvarLeaderboard(){
+    let data = JSON.parse(localStorage.getItem('leaderboard')||'[]');
+    data.push({rebirths:jogador.rebirths,dinheiro:jogador.dinheiro});
+    data = data.sort((a,b)=>b.rebirths-a.rebirths||b.dinheiro-a.dinheiro).slice(0,10);
+    localStorage.setItem('leaderboard',JSON.stringify(data));
+    mostrarLeaderboard();
+}
+function mostrarLeaderboard(){
+    let data = JSON.parse(localStorage.getItem('leaderboard')||'[]');
+    let lb = document.getElementById('leaderboard');
+    lb.innerHTML='';
+    data.forEach((e,i)=>{lb.innerHTML+=`${i+1}. Rebirths:${e.rebirths} | Dinheiro: R$${e.dinheiro.toFixed(2)}<br>`;});
+}
+mostrarLeaderboard();
+</script>
+
+</body>
+</html>
